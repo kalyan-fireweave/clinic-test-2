@@ -1,6 +1,8 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
+import { fw } from "@fireweaveai/server-sdk/start";
 import { account, invitation, member, organization as organizationTable, session, user, verification } from "@clinic/db";
 import { db } from "./db";
 import { env } from "./env";
@@ -25,6 +27,21 @@ export const auth = betterAuth({
     schema: { user, session, account, verification, organization: organizationTable, member, invitation },
   }),
   emailAndPassword: { enabled: true, minPasswordLength: 8 },
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (createdSession) => {
+          const [who] = await db.select().from(user).where(eq(user.id, createdSession.userId));
+          const [membership] = await db.select().from(member).where(eq(member.userId, createdSession.userId));
+          await fw.identify(createdSession.userId, {
+            email: who?.email,
+            clinicId: membership?.organizationId,
+            role: membership?.role,
+          });
+        },
+      },
+    },
+  },
   plugins: [
     organization({
       organizationHooks: {

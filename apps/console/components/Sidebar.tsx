@@ -4,10 +4,13 @@ import { Calendar, FileCheck, Inbox, LayoutDashboard, Mic, Settings, Sliders } f
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { fw } from "@fireweaveai/web-sdk/start";
 import { useCounts } from "../lib/counts";
 import { Button } from "./Button";
 
 type Props = {
+  userId: string;
   clinicName: string;
   userName: string;
   role: string;
@@ -48,13 +51,19 @@ function NavItem({
   );
 }
 
-export function Sidebar({ clinicName, userName, role }: Props) {
+export function Sidebar({ userId, clinicName, userName, role }: Props) {
   const path = usePathname();
   const { counts } = useCounts();
   const active = (href: string) => path === href || path.startsWith(`${href}/`) || (href === "/auth" && path.startsWith("/prior-auth"));
 
+  useEffect(() => {
+    // Session restore: an already-authenticated shell load, every time it mounts.
+    if (userId) void fw.identify(userId, { role, clinicName });
+  }, [userId, role, clinicName]);
+
   async function signOut() {
     await fetch("/api/auth/sign-out", { method: "POST" });
+    await fw.reset();
     window.location.href = "/login";
   }
 
